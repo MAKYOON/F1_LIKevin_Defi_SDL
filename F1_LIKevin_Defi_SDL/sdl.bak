@@ -1,0 +1,184 @@
+program defi;
+
+uses SDL2,SDL2_Image,SDL2_ttf,crt,sysutils;
+
+const FPS = 50;
+
+var
+  fenetre: PSDL_Window;
+  font : PTTF_Font;
+  sdlColor1, sdlColor2 : PSDL_Color;
+  render: PSDL_Renderer;
+  score_surface : PSDL_Surface;
+  helicopter,missile,godzilla,score_texture: PSDL_Texture;
+  rect_helico,position_helico,rect_missile, position_missile, rect_godzilla,position_godzilla,position_score: TSDL_Rect;
+  i,j,score: integer;
+  fin,touche : boolean;
+  evenement: PSDL_Event;
+  timerFPS : longint;
+  affichage_score : ansistring;
+  itos : string;
+
+
+Procedure initialisation;
+//BUT : initialisation des systèmes, images et variables
+//ENTREE : tout ce qui est nécessaire à l'initialisation
+//SORTIE : rien
+BEGIN
+  randomize;
+  new (evenement); // allocation de la mémoire pour les évènements
+  fin := false; //initialisation du booleen qui gère la boucle while à "faux"
+  touche:= false; //gère l'appui sur la touche 'ESPACE'
+  //initialisation du sous-systeme video
+  SDL_Init(SDL_INIT_VIDEO);
+  //initialisation du ttf
+  TTF_Init();
+  //création de la fenetre
+  SDL_CreateWindowAndRenderer(1000, 500, SDL_WINDOW_SHOWN, @fenetre, @render);
+
+  // qualite de l'image
+  SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, '2');
+
+  new(sdlColor1);
+  sdlColor1^.r := 255; sdlColor1^.g := 255; sdlColor1^.b := 255;
+    new(sdlColor2);
+  sdlColor2^.r := 0; sdlColor2^.g := 0; sdlColor2^.b := 0;
+
+  font := TTF_OpenFont('assets\arial.ttf', 50); //création de la police qui va être utilisée
+  TTF_SetFontStyle(font,TTF_STYLE_BOLD); //mise en gras du texte
+
+
+  // chargement de l'image
+  helicopter := IMG_LoadTexture( render, 'assets\helicopter.png' );
+  missile := IMG_LoadTexture( render, 'assets\missile.png' );
+  godzilla := IMG_LoadTexture( render, 'assets\godzilla.png' );
+
+  //rectangle de copie de l'hélicoptère
+  position_helico.x := 500; // x et y définissent sa position
+  position_helico.y := 200;
+  position_helico.w := 128; // w et h les dimensions du rectangles (adaptées à l'image de l'hélicoptère)
+  position_helico.h := 55;
+
+  position_score.x := 0;
+  position_score.y := 0;
+  position_score.w := 100;  //taille du rectangle de score
+  position_score.h := 50;
+
+
+  rect_missile.x := 0; // rectangle qui définit ce qui va être copié de l'image
+  rect_missile.y := 0;
+  rect_missile.w := 379;
+  rect_missile.h := 133;
+
+  position_missile.w := 50; //ces coordonnées resizent l'image (de 379x133 à 50x50)
+  position_missile.h := 50;
+
+  rect_godzilla.x := 0; // ici on définit ce qui va être copié de l'image
+  rect_godzilla.y := 0;
+  rect_godzilla.w := 150;
+  rect_godzilla.h := 200;
+
+  position_godzilla.x := random(900); // la on resize et on définit sa position aléatoire
+  position_godzilla.y := random(400);
+  position_godzilla.w := 100;
+  position_godzilla.h := 100;
+END;
+
+Procedure event;
+//BUT : gérer les évènements (souris, clavier)
+//ENTREE : souris ou clavier
+//SORTIE : rien
+BEGIN
+    //on détecte et renvoie la gestion d'évènements
+  while SDL_PollEvent(evenement) = 1 do
+    begin
+      case evenement^.type_ of
+        SDL_MOUSEMOTION: begin
+                              position_helico.x := evenement^.motion.x ; //on place l'hélico à la position x et y de la souris
+                              position_helico.y := evenement^.motion.y ;
+                         end;
+        SDL_KEYDOWN : begin
+                          if (evenement^.key.keysym.sym=SDLK_SPACE) then // ici si la touche espace est appuyée, on créer le missile
+                           begin
+                                position_missile.x := position_helico.x - 50;
+                                position_missile.y := position_helico.y + 50;
+                                touche := true;
+                           end;
+                      end;
+        end;
+      if (evenement^.key.keysym.sym=SDLK_ESCAPE) then //permet de quitter le programme
+        fin:= true;
+    END;
+END;
+
+Procedure tir;
+//BUT : tirer un missile
+//ENTREE : la variable touche en true
+//SORTIE : rien
+BEGIN
+        if (touche=true) then //touche devient true quand on appuie sur espace
+      begin
+          for j:= 1 to 50 do //mouvement du missile
+          begin
+           position_missile.x := position_missile.x - 1;
+            if ((position_missile.x = position_godzilla.x) and ((position_missile.y >= position_godzilla.y) and (position_missile.y <= position_godzilla.y+100))) then //détection de la collision avec godzilla
+            begin
+                score := score + 100;
+                position_godzilla.x := random(900); // la on resize et on définit sa position aléatoire
+                position_godzilla.y := random(400);
+            end;
+           SDL_RenderCopy(render, missile, @rect_missile, @position_missile);
+          end;
+      end;
+END;
+Procedure destroy;
+//BUT : tout détruire et clear la mémoire
+//ENTREE : des fonctions
+//SORTIE : rien
+BEGIN
+  // on détruit tout
+  dispose(evenement);
+  SDL_FreeSurface( score_surface);
+  SDL_DestroyTexture( score_texture );
+  SDL_DestroyTexture(godzilla);
+  SDL_DestroyTexture(missile);
+  SDL_DestroyTexture(helicopter);
+  SDL_DestroyRenderer(render);
+  SDL_DestroyWindow (fenetre);
+  //on quitte SDL
+  SDL_Quit;
+END;
+
+//programme principal
+BEGIN
+  initialisation();
+  score := 0;
+//boucle principale de jeu
+while (fin <> true) do
+begin
+	SDL_ShowCursor(SDL_DISABLE); //on désactive le pointeur de souris (visuellement moche)
+  timerFPS:= SDL_GetTicks(); //on récupère le temps depuis le début du programme
+ event(); //on gère les évènements
+	for i:=0 to 4 do //gestion de l'hélicoptère
+ 	begin
+	  rect_helico.x := i*128;
+	  rect_helico.y := 0;
+	  rect_helico.w := 128;
+	  rect_helico.h := 55;
+    timerFPS:=SDL_GetTicks() - timerFPS; // linges 170-172 : permettent de limiter le nombre d'images par secondes, définie par la constante FPS
+    if(timerFPS<1000 DIV FPS) then
+       SDL_Delay((1000 DIV FPS) - timerFPS);
+    SDL_RenderClear(render); //permet d'effacer l'image précédente à chaque fois
+    tir(); //on gère le tir
+    itos := inttostr(score); //passage de score en string
+    affichage_score:= ('SCORE :' + itos); //texte qui affiche le score
+    score_surface := TTF_RenderText_Shaded(font,PChar(affichage_score),sdlColor1^,sdlColor2^); //création de la surface avec le texte, sa couleur et sa police
+    score_texture := SDL_CreateTextureFromSurface( render, score_surface ); //passage de la surface à la texture
+    SDL_RenderCopy(render, score_texture, NIL, @position_score ); //on copie le score dans le render
+	  SDL_RenderCopy(render, helicopter, @rect_helico, @position_helico); //on copie l'hélicoptère dans le render
+    SDL_RenderCopy(render, godzilla, @rect_godzilla, @position_godzilla); //on copie le monstre dans le render
+    SDL_RenderPresent(render); // et on affiche le tout
+  end;
+END;
+destroy();
+end.
